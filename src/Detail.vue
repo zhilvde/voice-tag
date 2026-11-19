@@ -11,6 +11,7 @@ const props = defineProps<{ initialProject: Project }>()
 const emit = defineEmits<{ back: []; notice: [message: string, error?: boolean] }>()
 const project = ref(props.initialProject)
 const language = ref(project.value.language)
+const languageSelect = ref<HTMLSelectElement>()
 const audio = ref<HTMLAudioElement>()
 const audioUrl = ref('')
 const audioError = ref('')
@@ -52,6 +53,12 @@ const merge = ref(false)
 const selectExport = ref(false)
 const selected = ref<string[]>([])
 const status = computed(() => project.value.transcriptionStatus)
+const failedLanguageHint = computed(() => {
+  if (status.value !== 'failed') return ''
+  if (project.value.language === 'zh') return '上次选择了中文。如果录音是英文，请选择英文或自动识别后重试。'
+  if (project.value.language === 'en') return '上次选择了英文。如果录音是中文，请选择中文或自动识别后重试。'
+  return ''
+})
 const method = ref<Preferences['method']>('local')
 const apiModel = ref('')
 const preferencesLoaded = ref(false)
@@ -244,6 +251,11 @@ function startTranscription() {
     await call('start_transcription', { id: project.value.id, language: language.value })
     await refresh()
   })
+}
+
+function selectAutomaticLanguage() {
+  language.value = 'auto'
+  languageSelect.value?.focus()
 }
 
 function startManual() {
@@ -615,9 +627,15 @@ function exportFile() {
           <h2>{{ status === 'failed' ? '转写未完成' : '转写录音' }}</h2>
           <p v-if="project.transcriptionError" class="transcription-error" role="alert">{{ project.transcriptionError }}</p>
           <p v-else>音频已保存。</p>
+          <p v-if="failedLanguageHint" id="transcription-language-help" class="field-help transcription-language-help">
+            {{ failedLanguageHint }}
+            <button v-if="language !== 'auto'" type="button" class="text-button" :disabled="busy"
+                    @click="selectAutomaticLanguage">改用自动识别</button>
+          </p>
           <p v-if="preferencesLoaded" class="method-summary">{{ methodLabels[method] }}<span v-if="method === 'api'"> · {{ onlineRouteDescription(apiModel) }}</span></p>
           <div class="transcribe-actions">
-            <select v-model="language" class="form-button" aria-label="识别语言">
+            <select ref="languageSelect" v-model="language" class="form-button" aria-label="识别语言"
+                    :aria-describedby="failedLanguageHint ? 'transcription-language-help' : undefined">
               <option value="auto">自动识别语言</option><option value="zh">中文</option><option value="en">英文</option>
             </select>
             <button class="pill" :disabled="busy || Boolean(audioError) || !preferencesLoaded" @click="startTranscription">
