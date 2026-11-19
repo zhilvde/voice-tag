@@ -63,14 +63,3 @@ npm run tauri build -- --bundles nsis
 | `src-tauri/inference/` | Whisper 离线识别程序及 Windows 语音识别脚本 |
 | `scripts/` | 离线模型和识别程序的准备脚本 |
 | `public/licenses/` | 随应用分发的字体许可证 |
-
-## 版本与发布
-
-从 `1.0.0` 起使用 `主版本.次版本.修订版本`。例如，兼容的问题修复使用 `1.0.1`，向后兼容的新功能使用 `1.1.0`，破坏公开行为或数据兼容性的升级使用 `2.0.0`。预发布版可使用 `1.1.0-beta.1`。 [Semantic Versioning 2.0.0](https://semver.org/lang/zh-CN/)
-
-提交格式采用 `类型(范围): 描述`，例如 `feat(transcript): 支持按说话人筛选` 或 `fix(player): 修复拖动后高亮错位`。存在破坏性变更时使用 `!` 或在提交尾注中填写 `BREAKING CHANGE:`，说明影响及迁移方式。 [Conventional Commits 1.0.0](https://www.conventionalcommits.org/zh-hans/v1.0.0/)
-
-1. 在本地 `main` 分支合入通过检查的改动，写明用户可见的新增、变更和修复。 [CHANGELOG.md](CHANGELOG.md) · [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)
-2. 同步 `package.json`、`package-lock.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 和 `src-tauri/Cargo.lock` 中的应用版本。锁文件的依赖版本按需要更新。
-3. 重新检查并构建 Windows 安装包。验证升级后的数据读取，以及此次迭代涉及的操作路径。
-4. 使用 `chore(release): 1.0.0` 形式提交发布改动，再用 `git tag -a v1.0.0 -m "Release 1.0.0"` 形式标记对应提交。后续发布替换为实际版本号。
