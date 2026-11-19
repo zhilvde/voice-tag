@@ -244,6 +244,9 @@ fn curl_command() -> Command {
     command.args([
         "--disable",
         "--silent",
+        "--show-error",
+        "--connect-timeout",
+        "20",
         "--max-time",
         "1800",
         "--proto",
@@ -268,7 +271,7 @@ fn send(mut command: Command, url: &Url, key: Option<&str>) -> Result<String> {
         .arg("--url")
         .arg(url.as_str())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|_| "无法启动 Windows curl.exe，请检查 Windows 的 curl 工具是否可用。")?;
     let result = key.map_or(Ok(()), |key| {
@@ -283,14 +286,7 @@ fn send(mut command: Command, url: &Url, key: Option<&str>) -> Result<String> {
         .wait_with_output()
         .map_err(|_| "无法读取在线转写结果。")?;
     if !output.status.success() {
-        let reason = match output.status.code() {
-            Some(6 | 7) => "无法连接服务，请检查服务 URL 和网络。",
-            Some(26) => "无法读取音频文件。",
-            Some(28) => "在线服务响应超时。",
-            Some(35 | 60) => "无法建立安全连接，请检查服务的 HTTPS 证书。",
-            _ => "在线转写请求失败，请检查服务 URL 和网络。",
-        };
-        return Err(reason.into());
+        return Err(connection_error(output.status.code(), &output.stderr).into());
     }
     let output = String::from_utf8_lossy(&output.stdout);
     let (body, status) = output
@@ -319,6 +315,24 @@ fn send(mut command: Command, url: &Url, key: Option<&str>) -> Result<String> {
         _ => {}
     }
     Ok(body.to_owned())
+}
+
+fn connection_error(code: Option<i32>, stderr: &[u8]) -> &'static str {
+    let detail = String::from_utf8_lossy(stderr);
+    match code {
+        Some(5) => "无法解析代理地址，请检查系统代理或代理软件。",
+        Some(6) => "无法解析服务域名，请检查服务 URL 和网络的 DNS 设置。",
+        Some(7)
+            if detail.contains(" over proxy ") || detail.contains("Failed to connect to proxy") =>
+        {
+            "无法连接代理，请检查代理软件是否运行以及端口是否正确。"
+        }
+        Some(7) => "无法连接服务，请检查服务 URL、网络和系统代理。",
+        Some(26) => "无法读取音频文件。",
+        Some(28) => "连接或等待在线服务超时，请检查网络和代理。",
+        Some(35 | 60) => "无法建立安全连接，请检查服务的 HTTPS 证书。",
+        _ => "在线转写请求失败，请检查服务 URL 和网络。",
+    }
 }
 
 fn error_detail(response: &Value, key: Option<&str>) -> String {
@@ -565,6 +579,19 @@ pub fn polish(segments: &[Segment], prefs: &Preferences, key: &str) -> Result<Ve
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reports_connection_failures_without_exposing_stderr() {
+        let proxy_error = connection_error(
+            Some(7),
+            b"Failed to connect to host over proxy localhost:7897 secret",
+        );
+        assert!(proxy_error.starts_with("无法连接代理"));
+        assert!(!proxy_error.contains("secret"));
+        assert!(connection_error(Some(5), b"").starts_with("无法解析代理"));
+        assert!(connection_error(Some(6), b"").starts_with("无法解析服务"));
+        assert!(connection_error(Some(7), b"").starts_with("无法连接服务"));
+    }
     use std::{
         io::{BufRead, BufReader, Read},
         net::TcpListener,

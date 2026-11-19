@@ -20,7 +20,7 @@ use store::{ApiProfile, ApiProfiles, Preferences, Project, Segment, Speaker, Sto
 use symphonia::core::{
     formats::FormatOptions, io::MediaSourceStream, meta::MetadataOptions, probe::Hint,
 };
-use tauri::{Manager, State, WindowEvent};
+use tauri::{Manager, PhysicalPosition, PhysicalSize, State, WebviewWindow, WindowEvent};
 use uuid::Uuid;
 use winreg::{enums::HKEY_CURRENT_USER, RegKey};
 
@@ -482,6 +482,24 @@ async fn export_transcript(
     .map_err(|e| e.to_string())?
 }
 
+fn fit_startup_window(window: &WebviewWindow) -> tauri::Result<()> {
+    let Some(monitor) = window.current_monitor()?.or(window.primary_monitor()?) else {
+        return Ok(());
+    };
+    let area = monitor.work_area();
+    let requested = window.inner_size()?;
+    let width = requested.width.min(area.size.width);
+    let height = requested.height.min(area.size.height);
+    if width < requested.width || height < requested.height {
+        window.set_size(PhysicalSize::new(width, height))?;
+    }
+    window.set_position(PhysicalPosition::new(
+        area.position.x + ((area.size.width - width) / 2) as i32,
+        area.position.y + ((area.size.height - height) / 2) as i32,
+    ))?;
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -502,6 +520,9 @@ fn main() {
                 recording: Mutex::new(None),
                 _instance_lock: instance_lock,
             });
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = fit_startup_window(&window);
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
