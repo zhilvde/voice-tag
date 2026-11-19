@@ -1,0 +1,15 @@
+{
+  "identifier": "main",
+  "description": "VoiceTag window controls and local file pickers",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-start-dragging",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-internal-toggle-maximize",
+    "dialog:allow-open",
+    "dialog:allow-save"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "声签",
+  "version": "1.0.0",
+  "identifier": "app.voicetag.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [{
+      "label": "main",
+      "title": "声签",
+      "width": 1040,
+      "height": 530,
+      "minWidth": 630,
+      "minHeight": 500,
+      "decorations": false,
+      "center": true,
+      "backgroundColor": "#f7f5fc"
+    }],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; media-src 'self' asset: http://asset.localhost; img-src 'self' data:; style-src 'self' 'unsafe-inline'",
+      "assetProtocol": { "enable": true, "scope": [] }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/icon.ico", "icons/icon.png"],
+    "resources": ["offline/voicetag-offline.exe", "offline/ggml-base-q5_1.bin", "offline/whisper.cpp-LICENSE.txt", "offline/whisper-LICENSE.txt"],
+    "windows": {
+      "webviewInstallMode": { "type": "offlineInstaller", "silent": true },
+      "nsis": { "installMode": "currentUser", "compression": "zlib", "languages": ["SimpChinese"] }
+    }
+  }
+}
