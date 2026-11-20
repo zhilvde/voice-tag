@@ -7,6 +7,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import Detail from './Detail.vue'
 import Icon from './Icon.vue'
 import Settings from './Settings.vue'
+import VoiceSelect from './VoiceSelect.vue'
 import { call, clock, errorMessage } from './desktop'
 import type { Project, RecordingStatus } from './desktop'
 
@@ -23,6 +24,20 @@ const noticeError = ref(false)
 const search = ref('')
 const historyFilter = ref('')
 const historySort = ref<'newest' | 'oldest' | 'longest' | 'shortest'>('newest')
+const historyStatuses = [
+  { value: '', label: '全部状态' },
+  { value: 'pending', label: '待转写' },
+  { value: 'processing', label: '转写中' },
+  { value: 'complete', label: '已完成' },
+  { value: 'failed', label: '转写失败' },
+  { value: 'recording-failed', label: '录音失败' },
+]
+const historySorts = [
+  { value: 'newest', label: '最新录音' },
+  { value: 'oldest', label: '最早录音' },
+  { value: 'longest', label: '最长录音' },
+  { value: 'shortest', label: '最短录音' },
+] satisfies { value: typeof historySort.value; label: string }[]
 const dialog = ref<'delete' | null>(null)
 const actionProject = ref<Project | null>(null)
 const editingId = ref('')
@@ -273,14 +288,8 @@ onUnmounted(() => { window.clearInterval(poll); window.clearTimeout(noticeTimer)
           <div v-if="projects.length" class="history-tools">
             <label class="search-box"><Icon name="search" /><input v-model="search" type="search" placeholder="搜索录音名称" aria-label="搜索记录" /></label>
             <div class="history-filters">
-              <select v-model="historyFilter" class="form-button" aria-label="筛选转写状态">
-                <option value="">全部状态</option><option value="pending">待转写</option><option value="processing">转写中</option>
-                <option value="complete">已完成</option><option value="failed">转写失败</option><option value="recording-failed">录音失败</option>
-              </select>
-              <select v-model="historySort" class="form-button" aria-label="排序历史记录">
-                <option value="newest">最新录音</option><option value="oldest">最早录音</option>
-                <option value="longest">最长录音</option><option value="shortest">最短录音</option>
-              </select>
+              <VoiceSelect v-model="historyFilter" aria-label="筛选转写状态" :options="historyStatuses" />
+              <VoiceSelect v-model="historySort" aria-label="排序历史记录" :options="historySorts" />
             </div>
           </div>
           <div v-if="!filtered.length" class="empty-history">

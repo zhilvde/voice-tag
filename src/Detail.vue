@@ -4,6 +4,7 @@ import { save } from '@tauri-apps/plugin-dialog'
 import { ElCheckbox, ElDialog } from 'element-plus'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import Icon from './Icon.vue'
+import VoiceSelect from './VoiceSelect.vue'
 import { call, clock, errorMessage, methodLabels, onlineRouteDescription } from './desktop'
 import type { Preferences, Project, ReplacementRule, Segment } from './desktop'
 
@@ -11,7 +12,12 @@ const props = defineProps<{ initialProject: Project }>()
 const emit = defineEmits<{ back: []; notice: [message: string, error?: boolean] }>()
 const project = ref(props.initialProject)
 const language = ref(project.value.language)
-const languageSelect = ref<HTMLSelectElement>()
+const languageSelect = ref<{ focus: () => void }>()
+const languageOptions = [
+  { value: 'auto', label: '自动识别语言' },
+  { value: 'zh', label: '中文' },
+  { value: 'en', label: '英文' },
+] satisfies { value: Project['language']; label: string }[]
 const audio = ref<HTMLAudioElement>()
 const audioUrl = ref('')
 const audioError = ref('')
@@ -19,6 +25,13 @@ const position = ref(0)
 const duration = ref(project.value.duration)
 const playing = ref(false)
 const rate = ref(1)
+const rateOptions = [
+  { value: 0.75, label: '0.75×' },
+  { value: 1, label: '1.0×' },
+  { value: 1.25, label: '1.25×' },
+  { value: 1.5, label: '1.5×' },
+  { value: 2, label: '2.0×' },
+]
 const busy = ref(false)
 const editing = ref(false)
 const focused = ref('')
@@ -47,6 +60,10 @@ const canSplit = computed(() => Boolean(splitSegment.value && splitParts.value.e
 const speakerNames = ref<Record<string, string>>({})
 const exportDialog = ref(false)
 const format = ref<'txt' | 'md'>('txt')
+const exportFormats = [
+  { value: 'txt', label: 'TXT' },
+  { value: 'md', label: 'Markdown (.md)' },
+] satisfies { value: typeof format.value; label: string }[]
 const timestamps = ref(true)
 const speakerLabels = ref(true)
 const merge = ref(false)
@@ -84,6 +101,10 @@ const knownSpeakers = computed(() => [...new Set(['A', 'B', ...project.value.spe
   id,
   name: project.value.speakers.find(speaker => speaker.id === id)?.name ?? `说话人 ${id}`,
 })))
+const speakerOptions = computed(() => [
+  ...knownSpeakers.value.map(speaker => ({ value: speaker.id, label: speaker.name })),
+  { value: 'unknown', label: '待确认' },
+])
 const shownSegments = computed(() => {
   const term = query.value.trim().toLowerCase()
   return orderedSegments.value.filter(segment => (!speakerFilter.value || segment.speakerId === speakerFilter.value) &&
@@ -315,8 +336,7 @@ function persist() {
   })
 }
 
-function changeSpeaker(segment: Segment, event: Event) {
-  const id = (event.target as HTMLSelectElement).value
+function changeSpeaker(segment: Segment, id: string) {
   const speaker = knownSpeakers.value.find(item => item.id === id)
   if (speaker && !project.value.speakers.some(item => item.id === id)) project.value.speakers.push(speaker)
   segment.speakerId = id
@@ -497,13 +517,7 @@ function exportFile() {
                :style="{ '--played': playbackProgress + '%' }" :disabled="!audioUrl || !duration || Boolean(audioError)"
                @input="seek(Number(($event.target as HTMLInputElement).value), true)" />
       </div>
-      <select v-model.number="rate" class="rate" aria-label="播放速度" @change="changeRate">
-        <option :value="0.75">0.75×</option>
-        <option :value="1">1.0×</option>
-        <option :value="1.25">1.25×</option>
-        <option :value="1.5">1.5×</option>
-        <option :value="2">2.0×</option>
-      </select>
+      <VoiceSelect v-model="rate" class="rate" aria-label="播放速度" :options="rateOptions" @update:model-value="changeRate" />
     </section>
     <p v-if="audioError || project.recordingError" class="detail-warning" role="status">{{ audioError || project.recordingError }}</p>
 
@@ -573,13 +587,9 @@ function exportFile() {
                    :class="{ 'segment-current': segment.id === activeSegmentId, 'segment-search-current': segment.id === searchMatchId }"
                    :aria-current="segment.id === activeSegmentId ? 'true' : undefined">
             <div class="segment-meta">
-              <span class="segment-assignment">
-                <span aria-hidden="true">改归属 <span class="assignment-arrow">⌄</span></span>
-                <select :value="segment.speakerId" :aria-label="`修改 ${clock(segment.start)} 的说话人`" @change="changeSpeaker(segment, $event)">
-                  <option v-for="speaker in knownSpeakers" :key="speaker.id" :value="speaker.id">{{ speaker.name }}</option>
-                  <option value="unknown">待确认</option>
-                </select>
-              </span>
+              <VoiceSelect :model-value="segment.speakerId" class="segment-assignment" display-label="改归属"
+                           :aria-label="`修改 ${clock(segment.start)} 的说话人`" :options="speakerOptions"
+                           @update:model-value="changeSpeaker(segment, $event)" />
               <span v-if="segment.id === activeSegmentId && playing" class="segment-playing"><Icon name="wave" :size="14" />播放中</span>
               <span v-if="segment.overlap" class="overlap-tag">重叠发言</span>
               <button class="timestamp" :aria-label="`跳转至 ${clock(segment.start)}`" @click="seek(segment.start)">{{ clock(segment.start) }}</button>
@@ -634,10 +644,8 @@ function exportFile() {
           </p>
           <p v-if="preferencesLoaded" class="method-summary">{{ methodLabels[method] }}<span v-if="method === 'api'"> · {{ onlineRouteDescription(apiModel) }}</span></p>
           <div class="transcribe-actions">
-            <select ref="languageSelect" v-model="language" class="form-button" aria-label="识别语言"
-                    :aria-describedby="failedLanguageHint ? 'transcription-language-help' : undefined">
-              <option value="auto">自动识别语言</option><option value="zh">中文</option><option value="en">英文</option>
-            </select>
+            <VoiceSelect ref="languageSelect" v-model="language" class="recognition-language" aria-label="识别语言"
+                         :aria-describedby="failedLanguageHint ? 'transcription-language-help' : undefined" :options="languageOptions" />
             <button class="pill" :disabled="busy || Boolean(audioError) || !preferencesLoaded" @click="startTranscription">
               <Icon name="wave" />{{ status === 'failed' ? '重新转写' : '开始转写' }}
             </button>
@@ -697,7 +705,7 @@ function exportFile() {
     <ElDialog v-model="exportDialog" title="导出转写" width="min(460px, calc(100vw - 48px))" append-to-body :close-on-click-modal="!busy">
       <form class="dialog-form" @submit.prevent="exportFile">
         <label for="export-format">文件格式</label>
-        <select id="export-format" v-model="format"><option value="txt">TXT</option><option value="md">Markdown (.md)</option></select>
+        <VoiceSelect id="export-format" v-model="format" :options="exportFormats" />
         <div class="export-options">
           <ElCheckbox v-model="timestamps">包含时间戳</ElCheckbox>
           <ElCheckbox v-model="speakerLabels">保留说话人标签</ElCheckbox>

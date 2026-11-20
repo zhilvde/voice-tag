@@ -3,8 +3,16 @@ import { open } from '@tauri-apps/plugin-dialog'
 import { ElCheckbox } from 'element-plus'
 import { nextTick, onMounted, ref } from 'vue'
 import Icon from './Icon.vue'
+import VoiceSelect from './VoiceSelect.vue'
 import { call, errorMessage, methodLabels, onlineRouteDescription } from './desktop'
 import type { Preferences } from './desktop'
+
+const methodOptions = (Object.keys(methodLabels) as Preferences['method'][]).map(value => ({ value, label: methodLabels[value] }))
+const languageOptions = [
+  { value: 'auto', label: '自动识别' },
+  { value: 'zh', label: '中文' },
+  { value: 'en', label: '英文' },
+] satisfies { value: Preferences['language']; label: string }[]
 
 interface ApiProfile {
   id: string
@@ -195,18 +203,14 @@ function isActive(profile: ApiProfile) {
             <label for="directory">录音保存目录</label>
             <div class="field-row"><input id="directory" v-model="preferences.audioDirectory" required /><button type="button" class="form-button" :disabled="busy" @click="pickDirectory">选择</button></div>
             <div class="settings-grid">
-              <label for="method">转写方式
-                <select id="method" v-model="preferences.method">
-                  <option v-for="(label, method) in methodLabels" :key="method" :value="method">{{ label }}</option>
-                </select>
-              </label>
-              <label for="default-language">默认识别语言
-                <select id="default-language" v-model="preferences.language">
-                  <option value="auto">自动识别</option>
-                  <option value="zh">中文</option>
-                  <option value="en">英文</option>
-                </select>
-              </label>
+              <div class="settings-field">
+                <label for="method">转写方式</label>
+                <VoiceSelect id="method" v-model="preferences.method" :options="methodOptions" />
+              </div>
+              <div class="settings-field">
+                <label for="default-language">默认识别语言</label>
+                <VoiceSelect id="default-language" v-model="preferences.language" :options="languageOptions" />
+              </div>
             </div>
             <p v-if="preferences.method === 'api'" class="field-help">{{ api.activeId ? `在线模型 · ${api.profiles.find(profile => profile.id === api?.activeId)?.name}` : '请在 AI 配置中选择要使用的模型。' }}</p>
             <div class="dialog-actions"><button type="submit" class="form-button primary" :disabled="busy">保存设置</button></div>
